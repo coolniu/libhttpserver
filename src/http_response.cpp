@@ -25,8 +25,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "http_utils.hpp"
-#include "details/http_resource_mirror.hpp"
-#include "details/event_tuple.hpp"
 #include "webserver.hpp"
 #include "http_response.hpp"
 #include "http_response_builder.hpp"
@@ -35,6 +33,8 @@ using namespace std;
 
 namespace httpserver
 {
+
+class webserver;
 
 http_response::http_response(const http_response_builder& builder):
     content(builder._content_hook),
@@ -53,8 +53,6 @@ http_response::http_response(const http_response_builder& builder):
     keepalive_msg(builder._keepalive_msg),
     send_topic(builder._send_topic),
     underlying_connection(0x0),
-    ca(0x0),
-    closure_data(0x0),
     ce(builder._ce),
     cycle_callback(builder._cycle_callback),
     get_raw_response(this, builder._get_raw_response),
@@ -62,7 +60,10 @@ http_response::http_response(const http_response_builder& builder):
     enqueue_response(this, builder._enqueue_response),
     completed(false),
     ws(0x0),
-    connection_id(0x0)
+    connection_id(0x0),
+    _get_raw_response(builder._get_raw_response),
+    _decorate_response(builder._decorate_response),
+    _enqueue_response(builder._enqueue_response)
 {
 }
 
@@ -244,19 +245,14 @@ void http_response::get_raw_response_lp_receive(
 )
 {
     this->ws = ws;
-    this->connection_id = MHD_get_connection_info(
-            this->underlying_connection,
-            MHD_CONNECTION_INFO_CLIENT_ADDRESS
-    )->client_addr;
+    this->connection_id = this->underlying_connection;
 
     *response = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN, 80,
         &http_response::data_generator, (void*) this, NULL);
 
     ws->register_to_topics(
             topics,
-            connection_id,
-            keepalive_secs,
-            keepalive_msg
+            connection_id
     );
 }
 
@@ -269,15 +265,10 @@ ssize_t http_response::data_generator(
 {
     http_response* _this = static_cast<http_response*>(cls);
 
-    if(_this->ws->pop_signaled(_this->connection_id))
-    {
-        string message;
-        size_t size = _this->ws->read_message(_this->connection_id, message);
-        memcpy(buf, message.c_str(), size);
-        return size;
-    }
-    else
-        return 0;
+    string message;
+    size_t size = _this->ws->read_message(_this->connection_id, message);
+    memcpy(buf, message.c_str(), size);
+    return size;
 }
 
 void http_response::get_raw_response_lp_send(

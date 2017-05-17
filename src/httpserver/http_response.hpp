@@ -28,22 +28,21 @@
 #include <utility>
 #include <string>
 #include <iosfwd>
+#include <stdint.h>
+#include <vector>
+#include <iostream>
 
-#include "httpserver/details/http_resource_mirror.hpp"
+#include "httpserver/binders.hpp"
+#include "httpserver/http_utils.hpp"
 
 struct MHD_Connection;
+struct MHD_Response;
 
 namespace httpserver
 {
 
 class webserver;
 class http_response_builder;
-
-namespace http
-{
-    class header_comparator;
-    class arg_comparator;
-};
 
 namespace details
 {
@@ -68,7 +67,6 @@ typedef ssize_t(*cycle_callback_ptr)(char*, size_t);
 class http_response
 {
     public:
-
         http_response(const http_response_builder& builder);
 
         /**
@@ -92,16 +90,21 @@ class http_response
             keepalive_msg(b.keepalive_msg),
             send_topic(b.send_topic),
             underlying_connection(b.underlying_connection),
-            ca(0x0),
-            closure_data(0x0),
             ce(b.ce),
             cycle_callback(b.cycle_callback),
-            get_raw_response(b.get_raw_response),
-            decorate_response(b.decorate_response),
-            enqueue_response(b.enqueue_response),
+            get_raw_response(this, b._get_raw_response),
+            decorate_response(this, b._decorate_response),
+            enqueue_response(this, b._enqueue_response),
             completed(b.completed),
             ws(b.ws),
-            connection_id(b.connection_id)
+            connection_id(b.connection_id),
+            _get_raw_response(b._get_raw_response),
+            _decorate_response(b._decorate_response),
+            _enqueue_response(b._enqueue_response)
+        {
+        }
+
+        http_response(): response_code(-1)
         {
         }
 
@@ -110,7 +113,7 @@ class http_response
          * Method used to get the content from the response.
          * @return the content in string form
         **/
-        const std::string get_content()
+        std::string get_content()
         {
             return this->content;
         }
@@ -125,7 +128,7 @@ class http_response
          * @param key The header identification
          * @return a string representing the value assumed by the header
         **/
-        const std::string get_header(const std::string& key)
+        std::string get_header(const std::string& key)
         {
             return this->headers[key];
         }
@@ -140,7 +143,7 @@ class http_response
          * @param key The footer identification
          * @return a string representing the value assumed by the footer
         **/
-        const std::string get_footer(const std::string& key)
+        std::string get_footer(const std::string& key)
         {
             return this->footers[key];
         }
@@ -150,7 +153,7 @@ class http_response
             result = this->footers[key];
         }
 
-        const std::string get_cookie(const std::string& key)
+        std::string get_cookie(const std::string& key)
         {
             return this->cookies[key];
         }
@@ -189,7 +192,7 @@ class http_response
             return this->response_code;
         }
 
-        const std::string get_realm() const
+        std::string get_realm() const
         {
             return this->realm;
         }
@@ -199,7 +202,7 @@ class http_response
             result = this->realm;
         }
 
-        const std::string get_opaque() const
+        std::string get_opaque() const
         {
             return this->opaque;
         }
@@ -209,7 +212,7 @@ class http_response
             result = this->opaque;
         }
 
-        const bool need_nonce_reload() const
+        bool need_nonce_reload() const
         {
             return this->reload_nonce;
         }
@@ -254,8 +257,6 @@ class http_response
         std::string keepalive_msg;
         std::string send_topic;
         struct MHD_Connection* underlying_connection;
-        void(*ca)(void*);
-        void* closure_data;
         details::cache_entry* ce;
         cycle_callback_ptr cycle_callback;
 
@@ -266,7 +267,7 @@ class http_response
         bool completed;
 
         webserver* ws;
-        struct http::httpserver_ska connection_id;
+        MHD_Connection* connection_id;
 
         void get_raw_response_str(MHD_Response** res, webserver* ws = 0x0);
         void get_raw_response_file(MHD_Response** res, webserver* ws = 0x0);
@@ -301,6 +302,11 @@ class http_response
         http_response& operator=(const http_response& b);
 
         static ssize_t data_generator (void* cls, uint64_t pos, char* buf, size_t max);
+
+        void (http_response::*_get_raw_response)(MHD_Response**, webserver*);
+        void (http_response::*_decorate_response)(MHD_Response*);
+        int (http_response::*_enqueue_response)(MHD_Connection*, MHD_Response*);
+
 };
 
 std::ostream &operator<< (std::ostream &os, const http_response &r);

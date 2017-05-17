@@ -45,98 +45,97 @@ size_t headerfunc(void *ptr, size_t size, size_t nmemb, map<string, string>* ss)
     return size*nmemb;
 }
 
-class simple_resource : public http_resource<simple_resource>
+class simple_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
-        void render_POST(const http_request& req, http_response** res)
+        const http_response render_POST(const http_request& req)
         {
-            *res = new http_response(
-                http_response_builder(req.get_arg("arg1")+req.get_arg("arg2"), 200, "text/plain").string_response()
-            );
+            return http_response_builder(req.get_arg("arg1")+req.get_arg("arg2"), 200, "text/plain").string_response();
         }
 };
 
-class long_content_resource : public http_resource<long_content_resource>
+class long_content_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
-            *res = new http_response(http_response_builder(lorem_ipsum, 200, "text/plain").string_response());
+            return http_response_builder(lorem_ipsum, 200, "text/plain").string_response();
         }
 };
 
-class header_test_resource : public http_resource<header_test_resource>
+class header_test_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
             http_response_builder hrb("OK", 200, "text/plain");
             hrb.with_header("KEY", "VALUE");
-            *res = new http_response(hrb.string_response());
+            return hrb.string_response();
         }
 };
 
-class complete_test_resource : public http_resource<complete_test_resource>
+class complete_test_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
-        void render_POST(const http_request& req, http_response** res)
+        const http_response render_POST(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
-        void render_PUT(const http_request& req, http_response** res)
+        const http_response render_PUT(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
-        void render_DELETE(const http_request& req, http_response** res)
+        const http_response render_DELETE(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
-        void render_CONNECT(const http_request& req, http_response** res)
+        const http_response render_CONNECT(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
 };
 
-class only_render_resource : public http_resource<only_render_resource>
+class only_render_resource : public http_resource
 {
     public:
-        void render(const http_request& req, http_response** res)
+        const http_response render(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
 };
 
-class ok_resource : public http_resource<ok_resource>
+class ok_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
-            *res = new http_response(http_response_builder("OK", 200, "text/plain").string_response());
+            return http_response_builder("OK", 200, "text/plain").string_response();
         }
 };
 
-class nok_resource : public http_resource<nok_resource>
+class nok_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
-            *res = new http_response(http_response_builder("NOK", 200, "text/plain").string_response());
+            return http_response_builder("NOK", 200, "text/plain").string_response();
         }
 };
 
-class no_response_resource : public http_resource<no_response_resource>
+class no_response_resource : public http_resource
 {
     public:
-        void render_GET(const http_request& req, http_response** res)
+        const http_response render_GET(const http_request& req)
         {
+            return http_response();
         }
 };
 
@@ -304,48 +303,72 @@ LT_BEGIN_AUTO_TEST(basic_suite, only_render)
     CURL* curl;
     CURLcode res;
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "OK");
     curl_easy_cleanup(curl);
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "OK");
     curl_easy_cleanup(curl);
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "OK");
     curl_easy_cleanup(curl);
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "CONNECT");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "OK");
     curl_easy_cleanup(curl);
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "NOT_EXISTENT");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "Method not Allowed");
     curl_easy_cleanup(curl);
 
+    s = "";
     curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, "localhost:8080/base");
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, NULL);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, 0);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writefunc);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &s);
     res = curl_easy_perform(curl);
     LT_ASSERT_EQ(res, 0);
+    LT_CHECK_EQ(s, "OK");
     curl_easy_cleanup(curl);
 
 LT_END_AUTO_TEST(only_render)
